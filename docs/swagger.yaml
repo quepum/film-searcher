@@ -1,0 +1,70 @@
+definitions:
+  main.Movie:
+    properties:
+      director:
+        type: string
+      id:
+        type: integer
+      title:
+        type: string
+      year:
+        type: integer
+    type: object
+info:
+  contact: {}
+paths:
+  /last-movie:
+    get:
+      consumes:
+      - application/json
+      description: Find last available movie on stand
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Movie'
+        "502":
+          description: Bad Gateway
+          schema:
+            type: string
+        "504":
+          description: Gateway Timeout
+          schema:
+            type: string
+      summary: Get last movie
+      tags:
+      - movies
+  /load-movies:
+    get:
+      consumes:
+      - application/json
+      description: Load movies from stand in range [from; to]
+      parameters:
+      - description: from
+        in: query
+        name: from
+        required: true
+        type: integer
+      - description: to
+        in: query
+        name: to
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Load movies in range
+      tags:
+      - movies
+swagger: "2.0"
