@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -43,7 +45,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 // @Produce json
 // @Param from query int true "from"
 // @Param to query int true "to"
-// @Success 200 {object} map[string]interface{}
+// @Success 200 {array} Movie
 // @Failure 400 {string} string "Bad Request"
 // @Router /load-movies [get]
 func (h *Handler) loadMovies(w http.ResponseWriter, r *http.Request) {
@@ -65,29 +67,22 @@ func (h *Handler) loadMovies(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
-	type failed struct {
-		ID    int    `json:"id"`
-		Error string `json:"error"`
-	}
-
-	resp := struct {
-		Movies []Movie  `json:"movies"`
-		Failed []failed `json:"failed"`
-	}{
-		Movies: []Movie{},
-		Failed: []failed{},
-	}
-
 	movies, failedMap := h.service.LoadMovies(ctx, from, to)
-	resp.Movies = movies
-	for id, ferr := range failedMap {
-		if errors.Is(ferr, ErrNotFound) {
-			resp.Failed = append(resp.Failed, failed{ID: id, Error: "not found"})
-			continue
+	if len(failedMap) > 0 {
+		ids := make([]int, 0, len(failedMap))
+		for id := range failedMap {
+			ids = append(ids, id)
 		}
-		resp.Failed = append(resp.Failed, failed{ID: id, Error: ferr.Error()})
+		sort.Ints(ids)
+		parts := make([]string, 0, len(ids))
+		for _, id := range ids {
+			parts = append(parts, strconv.Itoa(id))
+		}
+		w.Header().Set("X-Failed-IDs", strings.Join(parts, ","))
+		w.Header().Set("X-Failed-Count", strconv.Itoa(len(ids)))
 	}
-	writeJSON(w, http.StatusOK, resp)
+
+	writeJSON(w, http.StatusOK, movies)
 }
 
 // lastMovie godoc

@@ -1,8 +1,12 @@
 {
     "swagger": "2.0",
     "info": {
-        "contact": {}
+        "title": "Film Searcher API",
+        "contact": {},
+        "version": "1.0"
     },
+    "host": "localhost:8080",
+    "basePath": "/",
     "paths": {
         "/last-movie": {
             "get": {
@@ -72,8 +76,10 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Movie"
+                            }
                         }
                     },
                     "400": {
