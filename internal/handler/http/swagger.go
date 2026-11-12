@@ -1,4 +1,4 @@
-package main
+package http
 
 import (
 	_ "film-searcher/docs"
@@ -7,7 +7,7 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
-func swaggerHandler() http.Handler {
+func SwaggerHandler() http.Handler {
 	return httpSwagger.Handler(
 		httpSwagger.URL("/swagger/doc.json"),
 	)

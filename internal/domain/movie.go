@@ -1,4 +1,4 @@
-package main
+package domain
 
 type Movie struct {
 	ID       int    `json:"id"`

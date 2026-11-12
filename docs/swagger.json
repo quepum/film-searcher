@@ -25,7 +25,13 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/main.Movie"
+                            "$ref": "#/definitions/domain.Movie"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     "502": {
@@ -78,7 +84,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/main.Movie"
+                                "$ref": "#/definitions/domain.Movie"
                             }
                         }
                     },
@@ -93,7 +99,7 @@
         }
     },
     "definitions": {
-        "main.Movie": {
+        "domain.Movie": {
             "type": "object",
             "properties": {
                 "director": {

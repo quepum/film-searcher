@@ -3,6 +3,11 @@ package main
 import (
 	"context"
 	"errors"
+	"film-searcher/internal/adapter"
+	"film-searcher/internal/config"
+	gh "film-searcher/internal/handler/grpc"
+	hh "film-searcher/internal/handler/http"
+	"film-searcher/internal/usecase"
 	pb "film-searcher/proto"
 	"fmt"
 	"log"
@@ -16,19 +21,21 @@ import (
 )
 
 func main() {
-	cfg := Load()
+	cfg := config.Load()
+	timeout := 30 * time.Second
 
-	movieClient := NewClient(cfg.BaseURL)
-	movieService := NewMovieService(movieClient)
+	client := adapter.New(cfg.BaseURL, timeout)
+	uc := usecase.New(client)
+	httpHandler := hh.New(uc, timeout)
+	grpcHandler := gh.New(uc)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	mux := http.NewServeMux()
-	h := NewHandler(movieService)
-	h.RegisterRoutes(mux)
-	mux.Handle("/swagger/", swaggerHandler())
 
+	httpHandler.RegisterRoutes(mux)
+	mux.Handle("/swagger/", hh.SwaggerHandler())
 	httpServer := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           mux,
@@ -50,12 +57,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen grpc: %v", err)
 	}
-	grpcSrv := grpc.NewServer()
-	pb.RegisterMovieServiceServer(grpcSrv, NewServer(movieService))
+	grpcServer := grpc.NewServer()
+	pb.RegisterMovieServiceServer(grpcServer, grpcHandler)
 
 	go func() {
 		log.Printf("gRPC server listening on %s", cfg.GRPCAddr)
-		if err := grpcSrv.Serve(lis); err != nil {
+		if err := grpcServer.Serve(lis); err != nil {
 			log.Fatalf("gRPC server error: %v", err)
 		}
 	}()
@@ -67,7 +74,7 @@ func main() {
 	defer cancel()
 
 	_ = httpServer.Shutdown(shutdownCtx)
-	grpcSrv.GracefulStop()
+	grpcServer.GracefulStop()
 
 	fmt.Println("server stopped")
 }
