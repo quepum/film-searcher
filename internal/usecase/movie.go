@@ -9,17 +9,41 @@ import (
 
 type Service struct {
 	provider MovieProvider
+	repo     MovieRepository
 }
 
-func New(provider MovieProvider) *Service {
+func New(provider MovieProvider, repo MovieRepository) *Service {
 	return &Service{
 		provider: provider,
+		repo:     repo,
 	}
 }
 
 func (s *Service) GetLastMovie(ctx context.Context) (domain.Movie, error) {
+	movie, err := s.repo.GetLast(ctx)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrMovieNotFound):
+			return domain.Movie{}, domain.ErrMovieNotFound
+		default:
+			return domain.Movie{}, err
+		}
+	}
+
+	return movie, nil
+}
+
+func (s *Service) LoadMovies(ctx context.Context, from, to int) ([]domain.Movie, error) {
+	if from <= 0 || to <= 0 || from > to {
+		return []domain.Movie{}, fmt.Errorf("%w: from=%d to=%d", domain.ErrInvalidRange, from, to)
+	}
+
+	return s.repo.GetRange(ctx, from, to)
+}
+
+func (s *Service) findLastOnStand(ctx context.Context) (int, error) {
 	left := 1
-	right := 100000
+	right := 40000
 	lastFound := -1
 
 	for left <= right {
@@ -30,42 +54,50 @@ func (s *Service) GetLastMovie(ctx context.Context) (domain.Movie, error) {
 				right = mid - 1
 				continue
 			}
-			return domain.Movie{}, err
+			return 0, err
 		}
 		lastFound = mid
 		left = mid + 1
 	}
 
 	if lastFound < 1 {
-		return domain.Movie{}, domain.ErrMovieNotFound
+		return -1, domain.ErrMovieNotFound
 	}
-
-	return s.provider.GetMovie(ctx, lastFound)
+	return lastFound, nil
 }
 
-func (s *Service) LoadMovies(ctx context.Context, from, to int) ([]domain.Movie, error) {
-	if from <= 0 || to <= 0 || from > to {
-		return []domain.Movie{}, fmt.Errorf("%w: from=%d to=%d", domain.ErrInvalidRange, from, to)
+func (s *Service) Sync(ctx context.Context) error {
+	last, err := s.findLastOnStand(ctx)
+	if err != nil {
+		if errors.Is(err, domain.ErrMovieNotFound) {
+			return nil
+		}
+		return err
 	}
 
-	var movies []domain.Movie
-	var failedMovies []domain.MovieError
-	for i := from; i <= to; i++ {
-		if ctx.Err() != nil {
-			return movies, ctx.Err()
-		}
-		movie, err := s.provider.GetMovie(ctx, i)
-		if err != nil {
-			failedMovies = append(failedMovies, domain.MovieError{
-				ID:  i,
-				Err: err})
+	existing, err := s.repo.IDs(ctx)
+	if err != nil {
+		return fmt.Errorf("load existing ids: %w", err)
+	}
+	have := make(map[int]bool, len(existing))
+	for _, id := range existing {
+		have[id] = true
+	}
+
+	for id := 1; id <= last; id++ {
+		if have[id] {
 			continue
 		}
-		movies = append(movies, movie)
+		m, err := s.provider.GetMovie(ctx, id)
+		if err != nil {
+			if errors.Is(err, domain.ErrMovieNotFound) {
+				continue
+			}
+			return fmt.Errorf("fetch movie %d: %w", id, err)
+		}
+		if err := s.repo.Save(ctx, m); err != nil {
+			return fmt.Errorf("save movie %d: %w", id, err)
+		}
 	}
-
-	if len(failedMovies) > 0 {
-		return movies, &domain.PartialError{Failed: failedMovies}
-	}
-	return movies, nil
+	return nil
 }

@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"film-searcher/internal/adapter"
+	"film-searcher/internal/adapter/postgres"
 	"film-searcher/internal/config"
 	gh "film-searcher/internal/handler/grpc"
 	hh "film-searcher/internal/handler/http"
 	"film-searcher/internal/usecase"
+	"film-searcher/migrations"
 	pb "film-searcher/proto"
 	"fmt"
 	"log"
@@ -17,20 +19,50 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose/v3"
 	"google.golang.org/grpc"
 )
 
-func main() {
-	cfg := config.Load()
-	timeout := 30 * time.Second
+const timeout = 30 * time.Second
 
-	client := adapter.New(cfg.BaseURL, timeout)
-	uc := usecase.New(client)
-	httpHandler := hh.New(uc, timeout)
-	grpcHandler := gh.New(uc)
+func run() error {
+	cfg := config.Load()
+	if cfg.DatabaseURL == "" {
+		return fmt.Errorf("DATABASE_URL is required")
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	migrationDB := stdlib.OpenDBFromPool(pool)
+	defer migrationDB.Close()
+
+	provider, err := goose.NewProvider(goose.DialectPostgres, migrationDB, migrations.Files)
+	if err != nil {
+		return fmt.Errorf("create goose: %w", err)
+
+	}
+	if _, err := provider.Up(ctx); err != nil {
+		return fmt.Errorf("apply migrations: %w", err)
+	}
+
+	repo := postgres.New(pool)
+	stand := adapter.New(cfg.BaseURL, timeout)
+	uc := usecase.New(stand, repo)
+	if err := uc.Sync(ctx); err != nil {
+		return fmt.Errorf("sync movies: %w", err)
+	}
+
+	httpHandler := hh.New(uc, timeout)
+	grpcHandler := gh.New(uc)
 
 	mux := http.NewServeMux()
 
@@ -77,4 +109,12 @@ func main() {
 	grpcServer.GracefulStop()
 
 	fmt.Println("server stopped")
+
+	return nil
+}
+
+func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
 }
