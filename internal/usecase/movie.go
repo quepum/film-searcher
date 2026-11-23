@@ -43,7 +43,7 @@ func (s *Service) LoadMovies(ctx context.Context, from, to int) ([]domain.Movie,
 
 func (s *Service) findLastOnStand(ctx context.Context) (int, error) {
 	left := 1
-	right := 40000
+	right := 50000
 	lastFound := -1
 
 	for left <= right {

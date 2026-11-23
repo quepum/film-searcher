@@ -12,11 +12,13 @@ ORDER BY id DESC
 
 -- name: UpsertMovie :exec
 INSERT INTO movies (id, title, year, director)
-VALUES ($1, $2, $3, $4)
-    ON CONFLICT (id) DO UPDATE
-                            SET title    = EXCLUDED.title,
-                            year     = EXCLUDED.year,
-                            director = EXCLUDED.director;
+VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO
+UPDATE
+    SET title = EXCLUDED.title,
+    year = EXCLUDED.year,
+    director = EXCLUDED.director;
 
 -- name: ListMovieIDs :many
-SELECT id FROM movies ORDER BY id;
+SELECT id
+FROM movies
+ORDER BY id;
