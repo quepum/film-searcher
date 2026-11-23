@@ -8,6 +8,7 @@ import (
 var (
 	ErrMovieNotFound = errors.New("movie not found")
 	ErrInvalidRange  = errors.New("invalid range")
+	ErrInvalidQuery  = errors.New("invalid search query")
 )
 
 type MovieError struct {

@@ -10,12 +10,16 @@ import (
 type Service struct {
 	provider MovieProvider
 	repo     MovieRepository
+	index    SearchIndex
+	cache    SearchCache
 }
 
-func New(provider MovieProvider, repo MovieRepository) *Service {
+func New(provider MovieProvider, repo MovieRepository, index SearchIndex, cache SearchCache) *Service {
 	return &Service{
 		provider: provider,
 		repo:     repo,
+		index:    index,
+		cache:    cache,
 	}
 }
 
@@ -43,7 +47,7 @@ func (s *Service) LoadMovies(ctx context.Context, from, to int) ([]domain.Movie,
 
 func (s *Service) findLastOnStand(ctx context.Context) (int, error) {
 	left := 1
-	right := 50000
+	right := 100000
 	lastFound := -1
 
 	for left <= right {

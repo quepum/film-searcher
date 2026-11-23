@@ -1,6 +1,7 @@
 {
     "swagger": "2.0",
     "info": {
+        "description": "HTTP API for films",
         "title": "Film Searcher API",
         "contact": {},
         "version": "1.0"
@@ -74,6 +75,47 @@
                         "type": "integer",
                         "description": "to",
                         "name": "to",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/domain.Movie"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/search": {
+            "get": {
+                "description": "Search movies by words from title and director",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "movies"
+                ],
+                "summary": "Search movies",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "search query",
+                        "name": "q",
                         "in": "query",
                         "required": true
                     }

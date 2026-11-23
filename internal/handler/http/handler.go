@@ -13,12 +13,7 @@ import (
 	"time"
 )
 
-// Handler
-// @title Film Searcher API
-// @version 1.0
-// @description HTTP API for films
-// @host localhost:8080
-// @BasePath /
+// Handler is the HTTP transport adapter.
 type Handler struct {
 	uc      usecase.MovieUseCase
 	timeout time.Duration
@@ -34,6 +29,7 @@ func New(uc usecase.MovieUseCase, timeout time.Duration) *Handler {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /load-movies", h.loadMovies)
 	mux.HandleFunc("GET /last-movie", h.lastMovie)
+	mux.HandleFunc("GET /search", h.search)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -48,6 +44,8 @@ func writeError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, domain.ErrInvalidRange):
 		http.Error(w, "invalid range", http.StatusBadRequest)
+	case errors.Is(err, domain.ErrInvalidQuery):
+		http.Error(w, "invalid search query", http.StatusBadRequest)
 	case errors.Is(err, context.DeadlineExceeded):
 		http.Error(w, "timeout", http.StatusGatewayTimeout)
 	case errors.Is(err, domain.ErrMovieNotFound):
@@ -133,4 +131,31 @@ func (h *Handler) lastMovie(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, movie)
+}
+
+// search
+// @Summary Search movies
+// @Description Search movies by words from title and director
+// @Tags movies
+// @Accept json
+// @Produce json
+// @Param q query string true "search query"
+// @Success 200 {array} domain.Movie
+// @Failure 400 {string} string "Bad Request"
+// @Router /search [get]
+func (h *Handler) search(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query().Get("q")
+
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	movies, err := h.uc.SearchMovies(ctx, q)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if movies == nil {
+		movies = []domain.Movie{}
+	}
+	writeJSON(w, http.StatusOK, movies)
 }
