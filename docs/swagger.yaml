@@ -1,3 +1,4 @@
+basePath: /
 definitions:
   domain.Movie:
     properties:
@@ -10,12 +11,12 @@ definitions:
       year:
         type: integer
     type: object
+host: localhost:8080
 info:
-  contact: { }
+  contact: {}
+  description: HTTP API for films
   title: Film Searcher API
   version: "1.0"
-host: localhost:8080
-basePath: /
 paths:
   /last-movie:
     get:
@@ -74,6 +75,33 @@ paths:
           schema:
             type: string
       summary: Load movies in range
+      tags:
+      - movies
+  /search:
+    get:
+      consumes:
+      - application/json
+      description: Search movies by words from title and director
+      parameters:
+      - description: search query
+        in: query
+        name: q
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/domain.Movie'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Search movies
       tags:
       - movies
 swagger: "2.0"

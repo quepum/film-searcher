@@ -28,8 +28,41 @@ func (q *Queries) GetLastMovie(ctx context.Context) (Movie, error) {
 	return i, err
 }
 
+const listAllMovies = `-- name: ListAllMovies :many
+SELECT id, title, year, director
+FROM movies
+ORDER BY id
+`
+
+func (q *Queries) ListAllMovies(ctx context.Context) ([]Movie, error) {
+	rows, err := q.db.Query(ctx, listAllMovies)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Movie{}
+	for rows.Next() {
+		var i Movie
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Year,
+			&i.Director,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMovieIDs = `-- name: ListMovieIDs :many
-SELECT id FROM movies ORDER BY id
+SELECT id
+FROM movies
+ORDER BY id
 `
 
 func (q *Queries) ListMovieIDs(ctx context.Context) ([]int64, error) {
@@ -45,6 +78,38 @@ func (q *Queries) ListMovieIDs(ctx context.Context) ([]int64, error) {
 			return nil, err
 		}
 		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMoviesByIDs = `-- name: ListMoviesByIDs :many
+SELECT id, title, year, director
+FROM movies
+WHERE id = ANY($1::bigint[])
+ORDER BY id
+`
+
+func (q *Queries) ListMoviesByIDs(ctx context.Context, dollar_1 []int64) ([]Movie, error) {
+	rows, err := q.db.Query(ctx, listMoviesByIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Movie{}
+	for rows.Next() {
+		var i Movie
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Year,
+			&i.Director,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -91,11 +156,11 @@ func (q *Queries) ListMoviesRange(ctx context.Context, arg ListMoviesRangeParams
 
 const upsertMovie = `-- name: UpsertMovie :exec
 INSERT INTO movies (id, title, year, director)
-VALUES ($1, $2, $3, $4)
-    ON CONFLICT (id) DO UPDATE
-                            SET title    = EXCLUDED.title,
-                            year     = EXCLUDED.year,
-                            director = EXCLUDED.director
+VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO
+UPDATE
+    SET title = EXCLUDED.title,
+    year = EXCLUDED.year,
+    director = EXCLUDED.director
 `
 
 type UpsertMovieParams struct {

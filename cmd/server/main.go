@@ -5,6 +5,7 @@ import (
 	"errors"
 	"film-searcher/internal/adapter"
 	"film-searcher/internal/adapter/postgres"
+	"film-searcher/internal/adapter/redisadapter"
 	"film-searcher/internal/config"
 	gh "film-searcher/internal/handler/grpc"
 	hh "film-searcher/internal/handler/http"
@@ -32,6 +33,9 @@ func run() error {
 	if cfg.DatabaseURL == "" {
 		return fmt.Errorf("DATABASE_URL is required")
 	}
+	if cfg.RedisAddr == "" {
+		return fmt.Errorf("REDIS_ADDR is required")
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -56,9 +60,19 @@ func run() error {
 
 	repo := postgres.New(pool)
 	stand := adapter.New(cfg.BaseURL, timeout)
-	uc := usecase.New(stand, repo)
+
+	rdb := redisadapter.New(cfg.RedisAddr)
+	defer rdb.Close()
+	if err := rdb.Ping(ctx); err != nil {
+		return fmt.Errorf("connect redis: %w", err)
+	}
+
+	uc := usecase.New(stand, repo, rdb, rdb)
 	if err := uc.Sync(ctx); err != nil {
 		return fmt.Errorf("sync movies: %w", err)
+	}
+	if err := uc.BuildIndex(ctx); err != nil {
+		return fmt.Errorf("build search index: %w", err)
 	}
 
 	httpHandler := hh.New(uc, timeout)
@@ -113,6 +127,11 @@ func run() error {
 	return nil
 }
 
+// @title Film Searcher API
+// @version 1.0
+// @description HTTP API for films
+// @host localhost:8080
+// @BasePath /
 func main() {
 	if err := run(); err != nil {
 		log.Fatal(err)

@@ -22,3 +22,14 @@ UPDATE
 SELECT id
 FROM movies
 ORDER BY id;
+
+-- name: ListAllMovies :many
+SELECT id, title, year, director
+FROM movies
+ORDER BY id;
+
+-- name: ListMoviesByIDs :many
+SELECT id, title, year, director
+FROM movies
+WHERE id = ANY($1::bigint[])
+ORDER BY id;

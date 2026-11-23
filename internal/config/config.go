@@ -9,6 +9,7 @@ type Config struct {
 	DatabaseURL string
 	HTTPAddr    string
 	GRPCAddr    string
+	RedisAddr   string
 }
 
 func Load() Config {
@@ -17,6 +18,7 @@ func Load() Config {
 		DatabaseURL: getEnv("DATABASE_URL", ""),
 		HTTPAddr:    getEnv("HTTP_ADDR", ":8080"),
 		GRPCAddr:    getEnv("GRPC_ADDR", ":9090"),
+		RedisAddr:   getEnv("REDIS_ADDR", ""),
 	}
 }
 
